@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="core/RippersCasino.Core.csproj" />
+  <Project Path="server/RippersCasino.Server.csproj" />
+  <Project Path="client/RippersCasino.Client.csproj" />
+  <Project Path="tests/RippersCasino.Tests.csproj" />
+  <Project Path="transaction-tests/RippersCasino.TransactionTests.csproj" />
+</Solution>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Version>1.0.0</Version><TargetFramework>net10.0</TargetFramework><CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies><AssemblyName>RippersCasino.Server</AssemblyName><RootNamespace>RippersCasino.Server</RootNamespace></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../core/RippersCasino.Core.csproj" />
+    <Reference Include="SPTarkov.Server.Core"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.Server.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.Common"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SPTarkov.DI"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.DI.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SemanticVersioning"><HintPath>$(SptRoot)/SPT_Runtime/SemanticVersioning.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(SptRoot)/SPT_Runtime/0Harmony.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup><None Include="../config/ripperscasino.json" Link="ripperscasino.defaults.json" CopyToOutputDirectory="PreserveNewest" /></ItemGroup>
+</Project>
