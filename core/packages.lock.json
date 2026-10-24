@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "HoldemPoker.Cards": {
+        "type": "Direct",
+        "requested": "[0.0.1, 0.0.1]",
+        "resolved": "0.0.1",
+        "contentHash": "JqlkNAjfdxFT3m6dBQ/26omKtI3UTxJMCtLg1FVkNKPyY6cZNeG1Q6re5g9B597w2Zo3RL/JpsKNrxgZX+Rr5Q=="
+      },
+      "HoldemPoker.Evaluator": {
+        "type": "Direct",
+        "requested": "[1.0.1, 1.0.1]",
+        "resolved": "1.0.1",
+        "contentHash": "kumUm4rsA/Lon3B5yXRqru9a9RUKBmyy/4QQHhuqy4SYSEYaS/sEO6Jy5OM7gMiCKKKaNyK3IvV0FcIaZGEMrg==",
+        "dependencies": {
+          "HoldemPoker.Cards": "0.0.1"
+        }
+      }
+    }
+  }
+}

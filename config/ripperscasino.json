@@ -1,0 +1,98 @@
+{
+  "enabled": true,
+  "redemptionEnabled": true,
+  "machine": {
+    "triples": [
+      100,
+      50,
+      25,
+      15,
+      10,
+      2
+    ],
+    "twoCherries": 2,
+    "id": "rippers-slot",
+    "bets": [
+      1,
+      5,
+      10,
+      25,
+      100,
+      500
+    ],
+    "symbols": [
+      "7",
+      "DIAMOND",
+      "BAR",
+      "BELL",
+      "CHERRY",
+      "LEMON"
+    ],
+    "weights": [
+      1,
+      2,
+      3,
+      4,
+      10,
+      10
+    ]
+  },
+  "maxBalance": 9223372036854774,
+  "racing": {
+    "enabled": true,
+    "racers": [
+      {
+        "id": "killa",
+        "name": "Killa",
+        "weight": 3465,
+        "returnMultiplier": 2
+      },
+      {
+        "id": "tagilla",
+        "name": "Tagilla",
+        "weight": 2310,
+        "returnMultiplier": 3
+      },
+      {
+        "id": "gluhar",
+        "name": "Gluhar",
+        "weight": 1386,
+        "returnMultiplier": 5
+      },
+      {
+        "id": "shturman",
+        "name": "Shturman",
+        "weight": 990,
+        "returnMultiplier": 7
+      },
+      {
+        "id": "sanitar",
+        "name": "Sanitar",
+        "weight": 770,
+        "returnMultiplier": 9
+      },
+      {
+        "id": "reshala",
+        "name": "Reshala",
+        "weight": 630,
+        "returnMultiplier": 11
+      }
+    ]
+  },
+  "cashier": {
+    "rubPerCurrencyUnit": {
+      "RUB": 1,
+      "USD": 136,
+      "EUR": 158
+    }
+  },
+  "economyVersion": 4,
+  "tables": {
+    "enabled": true,
+    "maxBuyIn": 5000,
+    "maxWager": 1000,
+    "blackjackDecks": 6,
+    "rouletteBetSeconds": 20,
+    "turnSeconds": 45
+  }
+}

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../server/RippersCasino.Server.csproj" />
+    <Reference Include="SPTarkov.Server.Core"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.Server.Core.dll</HintPath></Reference>
+    <Reference Include="SPTarkov.Common"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.Common.dll</HintPath></Reference>
+    <Reference Include="SPTarkov.DI"><HintPath>$(SptRoot)/SPT_Runtime/SPTarkov.DI.dll</HintPath></Reference>
+    <Reference Include="SemanticVersioning"><HintPath>$(SptRoot)/SPT_Runtime/SemanticVersioning.dll</HintPath></Reference>
+    <Reference Include="0Harmony"><HintPath>$(SptRoot)/SPT_Runtime/0Harmony.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>
+
+
