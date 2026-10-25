@@ -17,10 +17,8 @@ namespace RippersCasino.Client
         private readonly HashSet<Stage> _registeredStages = new HashSet<Stage>();
         private Texture2D _moduleIcon;
         private Transform _laptop;
-        private float _modulePollAt, _laptopProbeAt;
-        private bool _stateLoading, _laptopLogged;
         private HideoutPlayerOwner _menuOwner;
-        private AreaData _intelArea;
+        private AreaData _intelArea, _generatorArea;
         private HideoutArea _intelScene;
         private readonly InteractionAction _laptopAction = new InteractionAction { Name = "Rippers Casino" };
         internal static void RegisterLaptop(AreaTemplate template)
@@ -36,7 +34,7 @@ namespace RippersCasino.Client
         }
         internal static void RegisterLaptopStage(Stage stage)
         {
-            if (_instance == null || stage == null)
+            if (_instance == null || stage == null || _instance._registeredStages.Contains(stage))
                 return;
             if (stage.Interactions == null)
                 stage.Interactions = new RelatedInteractions();
@@ -55,53 +53,48 @@ namespace RippersCasino.Client
             _moduleIcon = new Texture2D(2, 2);
             ImageConversion.LoadImage(_moduleIcon, File.ReadAllBytes(path), true);
         }
-        private void TickModule()
+        private void DiscoverHideout()
         {
-            _casinoAudio?.Tick(HideoutScreenVisible, _open, _presentation.Active && !_presentation.Revealed);
-            if (!HideoutScreenVisible)
-            {
-                ClearLaptopMenu();
-                return;
-            }
-            if (!_busy && !GameActive && !_stateLoading && Time.unscaledTime >= _modulePollAt && !_open)
-            {
-                _modulePollAt = Time.unscaledTime + 8;
-                StartCoroutine(Guard(PollModule()));
-            }
-            if (_owner == null || _owner.IsGuest)
-            {
-                ClearLaptopMenu();
-                return;
-            }
+            if (!HideoutScreenVisible) return;
+            if (_owner == null) _owner = UnityEngine.Object.FindObjectOfType<HideoutPlayerOwner>();
             if (_intelScene == null)
             {
-                var area = Resources.FindObjectsOfTypeAll<HideoutArea>().FirstOrDefault(a => a.gameObject.scene.IsValid() && a.Data?.Template.Type == EAreaType.IntelligenceCenter);
-                if (area != null)
+                foreach (var area in UnityEngine.Object.FindObjectsOfType<HideoutArea>(true))
                 {
-                    _intelScene = area;
-                    _intelArea = area.Data;
-                    RegisterLaptop(_intelArea.Template);
+                    if (area.Data?.Template.Type == EAreaType.Generator) _generatorArea = area.Data;
+                    if (area.Data?.Template.Type == EAreaType.IntelligenceCenter)
+                    {
+                        _intelScene = area;
+                        _intelArea = area.Data;
+                        RegisterLaptop(_intelArea.Template);
+                    }
                 }
             }
-            if (_laptop == null && Time.unscaledTime >= _laptopProbeAt)
+            if (_laptop != null || _intelScene == null) return;
+            foreach (var candidate in _intelScene.GetComponentsInChildren<Transform>())
             {
-                _laptopProbeAt = Time.unscaledTime + 3;
-                var candidates = Resources.FindObjectsOfTypeAll<Transform>().Where(t => t.gameObject.scene.IsValid() && t.gameObject.activeInHierarchy && LaptopCandidates.Any(s => t.name.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0)).ToArray();
-                if (!_laptopLogged)
-                {
-                    _laptopLogged = true;
-                    if (_presentationDiagnostics.Value) Logger.LogInfo("[RippersCasino] Existing laptop candidates: " + string.Join(" | ", candidates.Take(20).Select(t => t.name + " @ " + t.position + " parent " + t.parent?.name)));
-                }
-                var candidate = candidates.Where(t => t.GetComponentInChildren<Renderer>() != null && t.name.IndexOf("closed", StringComparison.OrdinalIgnoreCase) < 0 && t.name.IndexOf("wires", StringComparison.OrdinalIgnoreCase) < 0).OrderBy(t => _intelScene != null && t.IsChildOf(_intelScene.transform) ? 0 : 1).ThenBy(t => _intelArea?.AreaIconPoint != null ? Vector3.Distance(t.position, _intelArea.AreaIconPoint.position) : 0).FirstOrDefault();
-                if (candidate != null)
-                {
-                    _laptop = candidate;
-                    while (_laptop.parent != null && LaptopNames.Any(s => _laptop.parent.name.IndexOf(s, StringComparison.OrdinalIgnoreCase) >= 0))
-                        _laptop = _laptop.parent;
-                    if (_presentationDiagnostics.Value) Logger.LogInfo("[RippersCasino] Reusing installed laptop model: " + _laptop.name + " @ " + _laptop.position + " Intel level " + _intelArea?.CurrentLevel + " interactions " + _intelArea?.CurrentStage?.Interactions?.Data?.Actions.Count);
-                }
+                if (!LaptopCandidates.Any(name => candidate.name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    candidate.name.IndexOf("closed", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    candidate.name.IndexOf("wires", StringComparison.OrdinalIgnoreCase) >= 0 || candidate.GetComponentInChildren<Renderer>() == null)
+                    continue;
+                _laptop = candidate;
+                while (_laptop.parent != null && LaptopNames.Any(name => _laptop.parent.name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0))
+                    _laptop = _laptop.parent;
+                break;
             }
-            if (!InHideout || _open || _laptop == null || _state?.available != true)
+        }
+        private void ResetHideoutReferences()
+        {
+            ClearLaptopMenu();
+            _owner = null;
+            _intelScene = null;
+            _intelArea = null;
+            _generatorArea = null;
+            _laptop = null;
+        }
+        private void TickModule()
+        {
+            if (!InHideout || _open || _laptop == null || _intelArea == null || _generatorArea == null || _intelArea.CurrentLevel < 1 || _generatorArea.CurrentLevel < 1)
             {
                 ClearLaptopMenu();
                 return;
@@ -158,23 +151,6 @@ namespace RippersCasino.Client
                 }
             }
             _menuOwner = null;
-        }
-        private System.Collections.IEnumerator PollModule()
-        {
-            _stateLoading = true;
-            try
-            {
-                var request = SPT.Common.Http.RequestHandler.GetJsonAsync("/ripperscasino/state");
-                var deadline = Time.unscaledTime + 20;
-                while (!request.IsCompleted && Time.unscaledTime < deadline)
-                    yield return null;
-                if (request.IsCompleted && !_busy && !GameActive)
-                    ReadState(request);
-            }
-            finally
-            {
-                _stateLoading = false;
-            }
         }
         private void DisposeModule()
         {

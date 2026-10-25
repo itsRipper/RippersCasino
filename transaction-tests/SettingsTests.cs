@@ -44,6 +44,6 @@ internal static partial class Program
         }
         finally { Directory.Delete(directory, true); }
         var metadata = new ModMetadata();
-        Check(metadata.ModGuid == "com.itsripper.ripperscasino" && metadata.Name == "RippersCasino" && metadata.Author == "itsRipper" && metadata.Version.ToString() == "1.0.0", "SPT metadata retains the stable client/server GUID and compliant name, author and version");
+        Check(metadata.ModGuid == "com.itsripper.ripperscasino" && metadata.Name == "RippersCasino" && metadata.Author == "itsRipper" && metadata.Version.ToString() == "1.0.1", "SPT metadata retains the stable client/server GUID and compliant name, author and version");
     }
 }

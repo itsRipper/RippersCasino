@@ -30,11 +30,13 @@ namespace RippersCasino.Client
         }
         private void TickTableSession()
         {
-            if (_open && (_page >= 5 || _tables?.table?.phase == "playing") && !_tablePolling && !_tableSending && !_busy && !GameActive && Time.unscaledTime >= _tablePollAt)
+            if (_readSession.CanPoll(HideoutScreenVisible) && (_page >= 5 || _tables?.table?.phase == "playing") && !_tablePolling && !_tableSending && !_busy && !_refreshing && !GameActive && Time.unscaledTime >= _tablePollAt)
                 StartCoroutine(Guard(PollTableSession()));
         }
         private IEnumerator PollTableSession()
         {
+            if (!_readSession.CanPoll(HideoutScreenVisible) || _tablePolling) yield break;
+            var generation = _readSession.Generation;
             _tablePolling = true;
             try
             {
@@ -42,9 +44,11 @@ namespace RippersCasino.Client
                 {
                     since = _tableCursor
                 }));
+                ObserveReadFailure(task);
                 var deadline = Time.unscaledTime + 20;
-                while (!task.IsCompleted && Time.unscaledTime < deadline)
+                while (_readSession.Accept(generation) && !task.IsCompleted && Time.unscaledTime < deadline)
                     yield return null;
+                if (!_readSession.Accept(generation)) yield break;
                 if (!task.IsCompleted)
                     _tableError = "Table unavailable. Your bankroll is saved. Close and reopen to try again.";
                 else
@@ -56,7 +60,7 @@ namespace RippersCasino.Client
                     catch (Exception error) { _tableError = "Table unavailable. Close and reopen to try again."; Logger.LogWarning("[RippersCasino] Tables: " + error.Message); }
                 }
             }
-            finally { _tablePolling = false; _tablePollAt = Time.unscaledTime + (_tableError == null ? 1.5f : 5); }
+            finally { _tablePolling = false; _tablePollAt = _readSession.Accept(generation) ? Time.unscaledTime + (_tableError == null ? 1.5f : 5) : 0; }
         }
         private bool ApplyTableResponse(TableResponse response)
         {
@@ -71,10 +75,13 @@ namespace RippersCasino.Client
             {
                 if (response.state.economyVersion != 4 || response.state.balance < 0 || response.state.sequence < 1)
                     throw new InvalidDataException("Invalid table snapshot.");
-                ObserveBlackjack(_tables?.table?.blackjack, response.state.table?.blackjack);
-                ObservePoker(_tables?.table?.poker, response.state.table?.poker);
-                ObserveRoulette(_tables?.table?.roulette, response.state.table?.roulette, response.serverTime);
-                ObserveElimination(_tables?.table?.elimination, response.state.table?.elimination);
+                if (_open)
+                {
+                    ObserveBlackjack(_tables?.table?.blackjack, response.state.table?.blackjack);
+                    ObservePoker(_tables?.table?.poker, response.state.table?.poker);
+                    ObserveRoulette(_tables?.table?.roulette, response.state.table?.roulette, response.serverTime);
+                    ObserveElimination(_tables?.table?.elimination, response.state.table?.elimination);
+                }
                 _tables = response.state;
                 RefreshBlackjackBet();
                 if (_state != null && !_busy && !GameActive && _pending == null)
@@ -92,7 +99,7 @@ namespace RippersCasino.Client
             _tableError = null;
             return true;
         }
-        private bool TableControls => !_tableSending && !_busy && !GameActive && _pending == null && _tablePending == null;
+        private bool TableControls => _open && !_tableSending && !_busy && !_refreshing && !GameActive && _pending == null && _tablePending == null;
         private void BeginTableAction(string operation, int amount = 0, string selection = "")
         {
             if (!TableControls || _tables == null)

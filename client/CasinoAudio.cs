@@ -64,7 +64,7 @@ namespace RippersCasino.Client
             _dirty = true;
             _ready = false;
             _readyAt = Time.unscaledTime + .25f;
-            _log?.Invoke("[RippersCasino] Audio configuration reset; invalidated PCM bank will rebuild after native audio stabilizes. device=" + deviceChanged);
+            if (_diagnostics()) _log?.Invoke("[RippersCasino] Audio configuration reset; invalidated PCM bank will rebuild after native audio stabilizes. device=" + deviceChanged);
         }
         private bool EnsureReady()
         {
@@ -121,25 +121,19 @@ namespace RippersCasino.Client
         internal void Tick(bool hideoutVisible, bool open, bool spinning)
         {
             var audible = hideoutVisible && open;
-            _gain = Mathf.MoveTowards(_gain, audible ? 1 : 0, Time.unscaledDeltaTime / .18f);
-            if (hideoutVisible)
-                EnsureReady();
-            if (audible) _nativeShot.Prepare();
+            if (!audible) return;
+            _gain = Mathf.MoveTowards(_gain, 1, Time.unscaledDeltaTime / .18f);
+            EnsureReady();
+            _nativeShot.Prepare();
             var volume = Mathf.Clamp01(_volume()) * _gain;
             _effects.volume = volume * Mathf.Clamp01(_effectsGain());
             _motor.volume = volume * .55f * Mathf.Clamp01(_reelsGain());
             _ambient.volume = volume * .035f;
-            if (_ready && audible && !_ambient.isPlaying)
+            if (_ready && !_ambient.isPlaying)
                 _ambient.Play();
-            if (!audible && _gain <= 0)
-            {
-                _effects.Stop();
-                _nativeShot.Release();
-                _ambient.Stop();
-            }
-            if (_ready && audible && spinning && !_motor.isPlaying)
+            if (_ready && spinning && !_motor.isPlaying)
                 _motor.Play();
-            if ((!spinning || !audible) && _motor.isPlaying)
+            if (!spinning && _motor.isPlaying)
                 _motor.Stop();
             if (_probePending && Time.unscaledTime >= _probeAt)
             {
@@ -179,6 +173,7 @@ namespace RippersCasino.Client
             _motor.Stop();
             _ambient.Stop();
             _gain = 0;
+            _probePending = false;
         }
         private void Probe()
         {

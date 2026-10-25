@@ -11,10 +11,11 @@ using EFT.UI;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 
 namespace RippersCasino.Client
 {
-    [BepInPlugin("com.itsripper.ripperscasino", "itsRipper-RippersCasino", "1.0.0")]
+    [BepInPlugin("com.itsripper.ripperscasino", "itsRipper-RippersCasino", "1.0.1")]
     public sealed partial class CasinoPlugin : BaseUnityPlugin
     {
         private static CasinoPlugin _instance;
@@ -26,7 +27,9 @@ namespace RippersCasino.Client
         private string _heardConnectionError;
         private double PresentationElapsed => (_presentation.Resolved ? Time.unscaledTime - _resolveAt : Time.unscaledTime - _waitingAt) * _spinClockRate;
         private HideoutPlayerOwner _owner;
-        private float _scanAt, _suppressUntil, _resolveAt, _waitingAt;
+        private float _suppressUntil, _resolveAt, _waitingAt;
+        private bool _hideoutVisible, _resourcesLoaded;
+        private readonly CasinoReadSession _readSession = new CasinoReadSession();
         private bool _open, _busy, _restart, _pendingFromDisk, _requestSent;
         private CasinoState _state;
         private CasinoRequest _pending;
@@ -46,6 +49,7 @@ namespace RippersCasino.Client
 
         private GUIStyle _text, _small, _button, _center;
         private CabinetLettering _lettering;
+        private CasinoGui _guiHost;
         private Vector2 _guiOrigin;
         private Rect _guiClip = new Rect(-100000, -100000, 200000, 200000);
         private readonly System.Collections.Generic.Stack<Rect> _guiClips = new System.Collections.Generic.Stack<Rect>();
@@ -73,7 +77,7 @@ namespace RippersCasino.Client
         }
         private bool Overview => HideoutScreenVisible && !CommonUI.Instance.HideoutScreenRear.FirstPerson && Connected;
         private bool CanUse => InHideout || Overview;
-        private bool Available => _open && (_laptopSession?.Ready ?? true) && !_restart && !_busy && !GameActive && !JackpotCelebrating && _state?.enabled == true && _state.available && _state.economyVersion == 4 && _pending == null && !_tableSending && _tablePending == null;
+        private bool Available => _open && (_laptopSession?.Ready ?? true) && !_restart && !_busy && !_refreshing && !GameActive && !JackpotCelebrating && _state?.enabled == true && _state.available && _state.economyVersion == 4 && _pending == null && !_tableSending && _tablePending == null;
 
         private bool _disposed;
         private void Awake()
@@ -101,6 +105,7 @@ namespace RippersCasino.Client
             _patches = new Harmony("com.itsripper.ripperscasino.input");
             foreach (var type in new[] { typeof(MenuScreen), typeof(HideoutPlayerOwner), typeof(HideoutScreenOverlay), typeof(HideoutScreenRear) })
                 Patch(type, "TranslateCommand", nameof(BlockCommand));
+            Patch(typeof(HideoutPlayerOwner), "TranslateCommand", nameof(CaptureHideoutOwner));
             Patch(typeof(MenuScreen), "Click", nameof(BlockClick));
             Patch(typeof(PlayerOwner), "TranslateAxes", nameof(BlockPlayerAxes));
             foreach (var type in new[] { typeof(HideoutScreenOverlay), typeof(HideoutScreenRear) })
@@ -114,14 +119,41 @@ namespace RippersCasino.Client
                 LoadTablePending();
             }
             catch (Exception ex) { throw new InvalidDataException("Recovery data unreadable; original files preserved.", ex); }
-            _casinoAudio = new CasinoAudio(gameObject, () => _audioMuted.Value ? 0 : _volume.Value, () => _effectsVolume.Value, () => _reelsVolume.Value, () => _audioDiagnostics.Value, message => Logger.LogInfo(message));
             _laptopSession = new LaptopSession(message => { if (_presentationDiagnostics.Value) Logger.LogInfo(message); }, () => _presentationDiagnostics.Value);
             _audioFocus = new HideoutAudioFocus(message => { if (_audioDiagnostics.Value) Logger.LogInfo(message); });
-            LoadModuleIcon();
-            LoadCasinoAssets();
+            SceneManager.sceneUnloaded += SceneUnloaded;
             IntelligenceCenterAccess.Install(_patches);
 
             Logger.LogInfo("[RippersCasino] Ready. Use the existing hideout laptop or the Intelligence Center Rippers Casino interaction.");
+        }
+        private void EnsureResources()
+        {
+            if (_resourcesLoaded) return;
+            try
+            {
+                _casinoAudio = new CasinoAudio(gameObject, () => _audioMuted.Value ? 0 : _volume.Value, () => _effectsVolume.Value, () => _reelsVolume.Value, () => _audioDiagnostics.Value, message => Logger.LogInfo(message));
+                LoadModuleIcon();
+                LoadCasinoAssets();
+                _guiHost = gameObject.AddComponent<CasinoGui>();
+                _guiHost.Draw = DrawFrame;
+                _guiHost.enabled = false;
+                _resourcesLoaded = true;
+            }
+            catch
+            {
+                enabled = false;
+                DisposePlugin();
+                throw;
+            }
+        }
+        private void SceneUnloaded(Scene scene)
+        {
+            if ((_owner != null && _owner.gameObject.scene == scene) || (_intelScene != null && _intelScene.gameObject.scene == scene))
+            {
+                Close(true);
+                ResetHideoutReferences();
+                _hideoutVisible = false;
+            }
         }
         private void Patch(Type type, string method, string prefix)
         {
@@ -150,10 +182,23 @@ namespace RippersCasino.Client
         }
         private void Tick()
         {
-            if (Time.unscaledTime >= _scanAt)
+            var hideout = HideoutScreenVisible;
+            if (hideout != _hideoutVisible)
             {
-                _scanAt = Time.unscaledTime + 1;
-                _owner = UnityEngine.Object.FindObjectOfType<HideoutPlayerOwner>();
+                _hideoutVisible = hideout;
+                if (hideout)
+                    DiscoverHideout();
+                else
+                {
+                    Close(true);
+                    ResetHideoutReferences();
+                }
+            }
+            if (!hideout) return;
+            if (!_open && !(_laptopSession?.Holding ?? false))
+            {
+                TickModule();
+                return;
             }
             _laptopSession?.Tick();
             SamplePresentation();
@@ -185,7 +230,7 @@ namespace RippersCasino.Client
                 _audioFocus?.Restore();
             if (!_open && !(_laptopSession?.Holding ?? false) && _blocker != null)
                 FinishClose();
-            TickModule();
+            if (_open) _casinoAudio?.Tick(true, true, _presentation.Active && !_presentation.Revealed);
             TickTableSession();
             TickRace();
             if (_open && _welcomePending && (_laptopSession?.Opacity ?? 1) > 0)
@@ -236,8 +281,14 @@ namespace RippersCasino.Client
             _oldLock = Cursor.lockState;
             _oldCursor = Cursor.visible;
             _open = true;
+            _readSession.Begin();
+            _tableCursor = "";
+            _tablePollAt = 0;
             try
             {
+                EnsureResources();
+                if (_laptop == null) DiscoverHideout();
+                SetGuiVisible(true);
                 CreateInputBlocker();
                 var ui = CommonUI.Instance;
                 _laptopSession.Begin(_laptop, ActiveCamera, ui.HideoutScreenRear.gameObject, ui.HideoutScreenOverlay.gameObject);
@@ -271,6 +322,16 @@ namespace RippersCasino.Client
                 Logger.LogInfo("[RippersCasino] Closing active " + (_racePresentation.Active ? "race" : "spin") + " presentation; resolved=" + (_racePresentation.Active ? _racePresentation.Resolved : _presentation.Resolved) + " elapsed=" + (_racePresentation.Active ? RaceElapsed : PresentationElapsed) + "; receipt retained, no new transaction.");
             _welcomePending = false;
             _open = false;
+            _readSession.End();
+            _presentation.Reject(_shownBalance);
+            _racePresentation.Reject(_shownBalance);
+            _casinoAudio?.Suspend();
+            _audioFocus?.Restore();
+            _eliminationWinAt = -1;
+            _eliminationRound = null;
+            _eliminationBefore = null;
+            _eliminationEffect = null;
+            _revolverTrigger.Seed("", 0);
             _suppressUntil = Time.unscaledTime + .25f;
             _casinoAudio?.StopSpin();
             if (force)
@@ -286,13 +347,26 @@ namespace RippersCasino.Client
             else
                 _laptopSession?.Leave();
         }
+        private void SetGuiVisible(bool visible)
+        {
+            var show = visible || _restart;
+            if (_guiHost != null) _guiHost.enabled = show;
+            _lettering?.SetVisible(show);
+        }
         private void FinishClose()
         {
             if (_blocker != null)
                 Destroy(_blocker);
             _blocker = null;
+            SetGuiVisible(false);
             Cursor.lockState = _oldLock;
             Cursor.visible = _oldCursor;
+        }
+        private static void CaptureHideoutOwner(HideoutPlayerOwner __instance)
+        {
+            if (_instance == null || _instance._owner == __instance) return;
+            _instance._owner = __instance;
+            if (_instance.HideoutScreenVisible) _instance.DiscoverHideout();
         }
         private static bool BlockClick() => _instance == null || !_instance.Mask;
         private static bool BlockCommand(ref InputNode.ETranslateResult __result)
@@ -327,7 +401,8 @@ namespace RippersCasino.Client
         {
             StopAllCoroutines();
             _busy = false;
-            _stateLoading = false;
+            _readSession.End();
+            _refreshing = false;
             _tablePolling = _tableSending = false;
             if (_pending != null && _requestSent)
             {
@@ -335,7 +410,8 @@ namespace RippersCasino.Client
                 _message = "Payment interrupted. Restart Tarkov to refresh your stash.";
             }
             Close(true);
-            ClearLaptopMenu();
+            ResetHideoutReferences();
+            _hideoutVisible = false;
             if (_blocker != null)
                 FinishClose();
             _audioFocus?.Restore();
@@ -346,6 +422,7 @@ namespace RippersCasino.Client
         {
             if (_disposed) return;
             _disposed = true;
+            SceneManager.sceneUnloaded -= SceneUnloaded;
             Close(true);
             if (_rouletteWheel != null)
                 Destroy(_rouletteWheel);
@@ -358,6 +435,7 @@ namespace RippersCasino.Client
             DisposeModule();
             if (_chipIcon != null) Destroy(_chipIcon);
             _lettering?.Dispose();
+            if (_guiHost != null) Destroy(_guiHost);
             if (_backroomTable != null) Destroy(_backroomTable);
             _revolverArtwork?.Dispose();
             if (_revolverArt != null) Destroy(_revolverArt);

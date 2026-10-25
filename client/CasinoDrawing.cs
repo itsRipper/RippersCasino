@@ -75,8 +75,9 @@ namespace RippersCasino.Client
             }
             return selected;
         }
-        private void OnGUI()
+        private void DrawFrame()
         {
+            if (!_restart && !_open && !(_laptopSession?.Holding ?? false)) return;
             try
             {
                 if (_open && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
@@ -139,7 +140,7 @@ namespace RippersCasino.Client
         }
         private void Draw()
         {
-            if (!HideoutScreenVisible && !_open)
+            if (!_open && !(_laptopSession?.Holding ?? false))
                 return;
             Styles();
             GUI.depth = -100;

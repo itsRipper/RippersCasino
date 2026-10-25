@@ -41,6 +41,10 @@ namespace RippersCasino.Client
             canvas.sortingOrder = 32760;
             UnityEngine.Object.DontDestroyOnLoad(_root);
         }
+        internal void SetVisible(bool visible)
+        {
+            if (_root != null && _root.activeSelf != visible) _root.SetActive(visible);
+        }
         public void BeginFrame()
         {
             _used = 0;

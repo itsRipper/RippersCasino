@@ -136,7 +136,7 @@ namespace RippersCasino.Client
             Label(new Rect(32, 860, 1100, 32), _autoSpin.Active ? "AUTO  /  " + _message : _page >= 6 && _tableActionError != null ? _tableActionError : _message, _small);
             if (_pending != null && !_restart)
             {
-                GUI.enabled = !_busy && !GameActive && (!_requestSent || _pendingFromDisk);
+                GUI.enabled = !_busy && !_refreshing && !GameActive && (!_requestSent || _pendingFromDisk);
                 if (Button(new Rect(1158, 862, 247, 25), "RESUME PAYMENT", _small))
                     StartCoroutine(Guard(Submit()));
                 GUI.enabled = true;

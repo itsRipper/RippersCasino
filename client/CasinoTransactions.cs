@@ -67,32 +67,45 @@ namespace RippersCasino.Client
                 (operation as IDisposable)?.Dispose();
             }
         }
+        private bool _refreshing;
+        private static void ObserveReadFailure(Task task)
+        {
+            // SPT's HTTP helper has no cancellation token; observe faults after a read is abandoned.
+            task.ContinueWith(failed => { var ignored = failed.Exception; },
+                System.Threading.CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+        }
         private IEnumerator Refresh()
         {
-            if (_busy || GameActive)
-                yield break;
-            _busy = true;
-            _message = "Loading…";
-            var task = RequestHandler.GetJsonAsync("/ripperscasino/state");
-            var end = Time.unscaledTime + 25;
-            while (!task.IsCompleted && Time.unscaledTime < end)
-                yield return null;
-            if (!task.IsCompleted)
-                _message = "Casino unavailable. Close and reopen to try again.";
-            else if (ReadState(task) && _pending != null)
+            var generation = _readSession.Generation;
+            while (_refreshing && _readSession.Accept(generation)) yield return null;
+            if (!_readSession.CanPoll(HideoutScreenVisible) || !_readSession.Accept(generation) || _busy || GameActive) yield break;
+            _refreshing = true;
+            try
             {
-                var receipt = MatchingReceipt();
-                if (_pendingFromDisk && receipt != null)
+                _message = "Loading…";
+                var task = RequestHandler.GetJsonAsync("/ripperscasino/state");
+                ObserveReadFailure(task);
+                var end = Time.unscaledTime + 25;
+                while (_readSession.Accept(generation) && !task.IsCompleted && Time.unscaledTime < end)
+                    yield return null;
+                if (!_readSession.Accept(generation)) yield break;
+                if (!task.IsCompleted)
+                    _message = "Casino unavailable. Close and reopen to try again.";
+                else if (ReadState(task) && _pending != null)
                 {
-                    ClearPending();
-                    _message = PlayerMessage(receipt.error) ?? "Previous payment restored.";
+                    var receipt = MatchingReceipt();
+                    if (_pendingFromDisk && receipt != null)
+                    {
+                        ClearPending();
+                        _message = PlayerMessage(receipt.error) ?? "Previous payment restored.";
+                    }
+                    else if (_state.sequence > _pending.sequence)
+                        RequireRestart("Your payment could not be confirmed. Restart Tarkov.");
+                    else
+                        _message = "A payment is waiting. Choose Resume to finish it.";
                 }
-                else if (_state.sequence > _pending.sequence)
-                    RequireRestart("Your payment could not be confirmed. Restart Tarkov.");
-                else
-                    _message = "A payment is waiting. Choose Resume to finish it.";
             }
-            _busy = false;
+            finally { _refreshing = false; }
         }
         private CasinoReceipt MatchingReceipt() => _state?.last?.id == _pending?.transactionId ? _state.last : null;
         private string PlayerMessage(string message)
@@ -110,6 +123,7 @@ namespace RippersCasino.Client
         {
             try
             {
+                if (!task.IsCompleted) throw new InvalidOperationException("Casino state has not completed.");
                 var state = JsonConvert.DeserializeObject<CasinoState>(task.GetAwaiter().GetResult());
                 if (state == null || state.economyVersion != 4 || state.cashierVersion != 3 || state.chipRubles != 1000 || state.symbols?.Length != 6 || state.bets == null || state.bets.Length == 0 || state.bets.Any(x => x <= 0))
                     throw new InvalidDataException("Invalid state.");
@@ -140,7 +154,7 @@ namespace RippersCasino.Client
         }
         private void Begin(string operation, long amount, string selection = null)
         {
-            if (!(_laptopSession?.Ready ?? true) || _busy || GameActive || _pending != null || _state?.enabled != true || !CanUse || _restart || !_state.available)
+            if (!(_laptopSession?.Ready ?? true) || _busy || _refreshing || GameActive || _pending != null || _state?.enabled != true || !CanUse || _restart || !_state.available)
                 return;
             var request = new CasinoRequest { transactionId = Guid.NewGuid().ToString("N"), sequence = _state.sequence, operation = operation, economyVersion = 4, exchangeVersion = operation == "buy" || operation == "redeem" ? 3 : 0, amount = amount, currency = _currencies[_currency], machine = operation == "race" ? "boss-racing" : "rippers-slot", selection = selection };
             try
@@ -269,6 +283,15 @@ namespace RippersCasino.Client
                 _busy = false;
                 yield break;
             }
+            if (!_open)
+            {
+                _presentation.Reject(_state.balance);
+                _racePresentation.Reject(_state.balance);
+                _shownBalance = _state.balance;
+                _lastRace = _state.lastRace;
+                _busy = false;
+                yield break;
+            }
             if (!string.IsNullOrEmpty(receipt.error))
             {
                 StopAutoOnError();
@@ -318,6 +341,7 @@ namespace RippersCasino.Client
         {
             StopAutoOnError();
             _restart = true;
+            SetGuiVisible(true);
             _message = message;
             _casinoAudio?.StopSpin();
             _presentation.Reject(_shownBalance);

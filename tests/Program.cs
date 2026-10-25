@@ -101,6 +101,7 @@ Test("wallet JSON preserves its schema and unknown saved fields", () =>
     Equal("old-receipt", root.GetProperty("LastRequestId").GetString());
     Equal(17, root.GetProperty("FutureData").GetProperty("value").GetInt32());
 });
+ClientLifecycleTests.Register(Test);
 CashierTests.Register(Test);
 PresentationTests.Register(Test);
         PublicReleaseTests.Register(Test);
