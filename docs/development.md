@@ -12,9 +12,9 @@
 pwsh -File tools/Build.ps1 -SptRoot 'C:\Games\SPT'
 ```
 
-This builds the solution, runs the automated and native transaction tests, and creates `artifacts/RippersCasino-1.0.0.zip`. `-SkipTests` skips test execution. For direct builds, pass `-p:SptRoot=...` or set `SPT_ROOT`.
+This builds the solution, runs the automated and native transaction tests, and creates `artifacts/RippersCasino-1.0.1.zip`. `-SkipTests` skips test execution. For direct builds, pass `-p:SptRoot=...` or set `SPT_ROOT`.
 
-Run checks separately:
+Build the complete solution before running checks separately: client lifecycle tests inspect the compiled client DLL without starting Unity.
 
 ```powershell
 dotnet run --project tests -c Release
@@ -29,7 +29,7 @@ Transaction and installer tests use synthetic profiles in disposable directories
 
 `tools/runtime-files.json` defines the complete runtime payload for packaging and the optional maintainer installer. The player ZIP contains only `BepInEx/` and `SPT_Runtime/`. The build consolidates the project MIT licence, HoldemPoker Apache-2.0 licence and notices, and asset provenance into `SPT_Runtime/user/mods/RippersCasino/NOTICE.txt`, preserving their complete text.
 
-`artifacts/SHA256SUMS.txt` contains the ZIP checksum. `artifacts/RippersCasino-1.0.0.files.sha256` contains per-file checksums for `tools/Install.ps1`. Neither verification file is installed. The package ships defaults, never a live configuration. Update the runtime manifest when adding runtime files.
+`artifacts/SHA256SUMS.txt` contains the ZIP checksum. `artifacts/RippersCasino-1.0.1.files.sha256` contains per-file checksums for `tools/Install.ps1`. Neither verification file is installed. The package ships defaults, never a live configuration. Update the runtime manifest when adding runtime files.
 
 The server bundles HoldemPoker.Evaluator 1.0.1 and HoldemPoker.Cards 0.0.1 under Apache-2.0. Client references are provided by the existing game, Unity, BepInEx and SPT installation.
 

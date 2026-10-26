@@ -19,16 +19,16 @@ Six casino games for your SPT hideout, with NPC opponents, custom interfaces, an
 
 ## Installation
 
-1. Download `RippersCasino-1.0.0.zip` from [GitHub Releases](https://github.com/itsRipper/RippersCasino/releases).
+1. Download `RippersCasino-1.0.1.zip` from [GitHub Releases](https://github.com/itsRipper/RippersCasino/releases).
 2. Close Tarkov and the SPT server.
 3. Extract the archive into your main SPT installation folder, beside `EscapeFromTarkov.exe`, merging the included directories.
 4. Start SPT and enter your hideout.
 
-See [installation and troubleshooting](INSTALL.md) for data locations and recovery guidance.
+See [installation and troubleshooting](INSTALL.md) for data locations and recovery guidance, and the [changelog](CHANGELOG.md) for release changes.
 
 ## Accessing the casino
 
-Use the Intelligence Center laptop or select **Rippers Casino** from the Intelligence Center's interactions. Games run offline against NPCs where applicable.
+Use the Intelligence Center laptop or select **Rippers Casino** from the Intelligence Center's interactions. Games run offline against NPCs where applicable. The first casino opening may take a moment.
 
 ## Issues and contributions
 

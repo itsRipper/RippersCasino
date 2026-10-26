@@ -1,11 +1,13 @@
 # Installation
 
-RippersCasino 1.0.0 supports **SPT 4.1.6**. Casino access requires **Intelligence Center Level 1** and **Generator Level 1**.
+RippersCasino 1.0.1 supports **SPT 4.1.6**. Casino access requires **Intelligence Center Level 1** and **Generator Level 1**.
 
-1. Download `RippersCasino-1.0.0.zip` from [GitHub Releases](https://github.com/itsRipper/RippersCasino/releases).
+1. Download `RippersCasino-1.0.1.zip` from [GitHub Releases](https://github.com/itsRipper/RippersCasino/releases).
 2. Close Tarkov and the SPT server.
 3. Extract the archive directly into the main SPT installation folder, beside `EscapeFromTarkov.exe`. Merge `BepInEx/` and `SPT_Runtime/`.
 4. Start SPT and use the Intelligence Center laptop or its **Rippers Casino** interaction.
+
+To update from 1.0.0, extract the new archive over the existing installation with Tarkov and the SPT server closed. Existing settings, casino balances and saved games are preserved.
 
 ## Troubleshooting and data
 
