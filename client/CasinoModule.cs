@@ -34,17 +34,10 @@ namespace RippersCasino.Client
         }
         internal static void RegisterLaptopStage(Stage stage)
         {
-            if (_instance == null || stage == null || _instance._registeredStages.Contains(stage))
+            if (_instance == null || stage == null)
                 return;
-            if (stage.Interactions == null)
-                stage.Interactions = new RelatedInteractions();
-            if (stage.Interactions.Data == null)
-                stage.Interactions.Data = new AvailableInteractionState();
-            if (!stage.Interactions.Data.Actions.Any(a => a.Name == "Rippers Casino"))
-            {
-                stage.Interactions.Data.Actions.Add(_instance._laptopAction);
-                _instance._registeredStages.Add(stage);
-            }
+            StageInteractionRegistration.Ensure(stage, _instance._laptopAction);
+            _instance._registeredStages.Add(stage);
         }
         private Camera ActiveCamera => EFT.CameraControl.CameraManager.Exist ? EFT.CameraControl.CameraManager.Instance.Camera : Camera.main;
         private void LoadModuleIcon()

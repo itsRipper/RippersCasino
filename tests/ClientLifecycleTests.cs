@@ -86,6 +86,17 @@ internal static class ClientLifecycleTests
             Require(!HasMethod("CasinoPlugin", "OnGUI") && HasMethod("CasinoGui", "OnGUI"), "IMGUI must belong to a separately suspended component");
             Require(Calls("CasinoPlugin", "FinishClose").Any(c => c.EndsWith("CasinoPlugin::SetGuiVisible")), "close must suspend the drawing component");
         });
+        test("client IL / Intel stage registration repairs live data instead of short-circuiting on stage history", () =>
+        {
+            var calls = Calls("CasinoPlugin", "RegisterLaptopStage");
+            Require(calls.Any(c => c.EndsWith("StageInteractionRegistration::Ensure")), "stage binding must check live interaction data");
+            Require(!calls.Any(c => c.EndsWith("::Contains")), "stage history cannot prove an interaction is still present");
+            NoCalls("StageInteractionRegistration", "Ensure", "Object::Find", "Resources::Find", "RequestHandler::", "File::");
+        });
+        test("client IL / existing Intel panel hook rebinds the current stage", () =>
+        {
+            Require(Calls("IntelligenceCenterAccess", "LaptopStage").Any(c => c.EndsWith("CasinoPlugin::RegisterLaptopStage")), "current-stage binding hook missing");
+        });
         test("client IL / close never stops financial coroutines", () =>
         {
             var calls = Calls("CasinoPlugin", "Close");
